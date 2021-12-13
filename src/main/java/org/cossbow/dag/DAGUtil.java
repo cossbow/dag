@@ -1,8 +1,6 @@
 package org.cossbow.dag;
 
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 final
 public class DAGUtil {
@@ -17,6 +15,13 @@ public class DAGUtil {
 
         }
         return true;
+    }
+
+    public static <E, C extends Collection<E>, S extends Collection<E>>
+    Set<E> subtract(C minuend, S subtraction) {
+        var result = new HashSet<>(minuend);
+        result.removeAll(subtraction);
+        return result;
     }
 
 }
