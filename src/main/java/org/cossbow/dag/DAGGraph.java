@@ -2,97 +2,117 @@ package org.cossbow.dag;
 
 import java.util.*;
 
+import static org.cossbow.dag.DAGUtil.hashSet;
+import static org.cossbow.dag.DAGUtil.toImmutable;
+
+
+/**
+ * <h3>有向无环图</h3>
+ * <div>设计为不可变类型，创建时构建好图并检查错误</div>
+ * <div>2021-12-14</div>
+ *
+ * @author jiangjianjun5
+ */
 public class DAGGraph<Key> {
-    private final Set<Key> keys;
+    private final Set<Key> allNodes;
+
+    private final Set<Key> heads, tails;
 
     private final Map<Key, Set<Key>> edgesMap;
     private final Map<Key, Set<Key>> reverseEdgesMap;
 
-    public DAGGraph(Set<Key> keys,
-                    List<Map.Entry<Key, Key>> edges) {
-        if (null == keys || keys.isEmpty()) {
+    public DAGGraph(Collection<Key> allNodes,
+                    Collection<Map.Entry<Key, Key>> edges) {
+        if (null == allNodes || allNodes.isEmpty()) {
             throw new IllegalArgumentException("keys empty");
         }
+        this.allNodes = Set.copyOf(allNodes);
+        if (this.allNodes.size() != allNodes.size()) {
+            throw new IllegalArgumentException("Has duplicate Key");
+        }
+
         var edgesMap = new HashMap<Key, Set<Key>>();
         var reverseEdgesMap = new HashMap<Key, Set<Key>>();
-        for (var e : edges) {
-            if (!keys.contains(e.getKey())) {
+        var queue = new LinkedList<Key>();
+        for (var edge : edges) {
+            Key from = edge.getKey(), to = edge.getValue();
+
+            if (!this.allNodes.contains(from)) {
+                throw new IllegalArgumentException("Key not exists: " + from);
+            }
+            if (!this.allNodes.contains(to)) {
+                throw new IllegalArgumentException("Key not exists: " + to);
+            }
+
+            if (!isLegalAddEdge(allNodes.size(), queue, edgesMap, from, to)) {
                 throw new IllegalArgumentException(
-                        "Key " + e.getKey() + " not exists in nodes");
+                        "Serious error: edge(" + from + " -> " + to + ") is invalid, cause cycle！");
             }
-            if (!keys.contains(e.getValue())) {
-                throw new IllegalArgumentException(
-                        "Key " + e.getValue() + " not exists in nodes");
-            }
-            addEdge(e.getKey(), e.getValue(), edgesMap);
-            addEdge(e.getValue(), e.getKey(), reverseEdgesMap);
+            queue.clear();
+
+            edgesMap.computeIfAbsent(from, hashSet()).add(to);
+            reverseEdgesMap.computeIfAbsent(to, hashSet()).add(from);
         }
-        // TODO check
-        for (var e : edgesMap.entrySet()) {
-            e.setValue(Set.copyOf(e.getValue()));
-        }
-        for (var e : reverseEdgesMap.entrySet()) {
-            e.setValue(Set.copyOf(e.getValue()));
-        }
-        //
-        this.keys = Set.copyOf(keys);
-        this.edgesMap = Map.copyOf(edgesMap);
-        this.reverseEdgesMap = Map.copyOf(reverseEdgesMap);
+
+        this.edgesMap = toImmutable(edgesMap);
+        this.reverseEdgesMap = toImmutable(reverseEdgesMap);
+        this.tails = DAGUtil.subtract(this.allNodes, this.edgesMap.keySet());
+        this.heads = DAGUtil.subtract(this.allNodes, this.reverseEdgesMap.keySet());
     }
 
-    private void topologicalSort(Set<Key> keys,
-                                 Map<Key, Set<Key>> edgesMap) {
-
-        var prev = new ArrayList<>(edgesMap.keySet());
-        var queue = new ArrayDeque<>(prev);
-        var next = new ArrayList<Key>();
-        while (queue.size() >= keys.size()) {
-            for (Key key : prev) {
-                next.addAll(edgesMap.get(key));
-            }
-            queue.addAll(next);
-            prev.clear();
-            prev.addAll(next);
-            next.clear();
+    private boolean isLegalAddEdge(
+            int verticesCount,
+            LinkedList<Key> queue,
+            Map<Key, Set<Key>> edgesMap,
+            Key fromNode, Key toNode) {
+        if (Objects.equals(fromNode, toNode)) {
+            return false;
         }
 
-    }
+        queue.add(toNode);
 
+        while (!queue.isEmpty() && (--verticesCount > 0)) {
+            Key key = queue.poll();
+            var subsequentNodes = edgesMap.get(key);
+            if (null != subsequentNodes) {
+                for (Key subsequentNode : subsequentNodes) {
+                    if (subsequentNode.equals(fromNode)) {
+                        return false;
+                    }
 
-    private boolean check(int keyCount, Map<Key, Set<Key>> edgesMap) {
-        var queue = new ArrayDeque<Key>();
-        var prev = new ArrayList<>(edgesMap.keySet());
-        var next = new ArrayList<Key>();
-        while (keyCount <= queue.size()) {
-            for (Key key : prev) {
-                var n = edgesMap.get(key);
-                if (null == n) continue;
-                next.addAll(n);
-                queue.addAll(prev);
-                prev.clear();
-                prev.addAll(next);
-                next.clear();
+                    queue.add(subsequentNode);
+                }
             }
         }
-        return queue.size() > keyCount;
-    }
 
-    private boolean tarjan() {
-        return false;
+        return true;
     }
 
     private void addEdge(Key from, Key to, Map<Key, Set<Key>> map) {
         map.computeIfAbsent(from, k -> new HashSet<>()).add(to);
     }
 
+
+    //
+
+    public Set<Key> allNodes() {
+        return allNodes;
+    }
+
+    public Set<Key> heads() {
+        return heads;
+    }
+
     public Set<Key> tails() {
-        var set = new HashSet<>(keys);
-        set.removeAll(edgesMap.keySet());
-        return set;
+        return tails;
     }
 
     public Set<Key> prev(Key key) {
         return reverseEdgesMap.getOrDefault(key, Set.of());
+    }
+
+    public Set<Key> next(Key key) {
+        return edgesMap.getOrDefault(key, Set.of());
     }
 
 }
