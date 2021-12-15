@@ -5,7 +5,7 @@ import java.util.*;
 import java.util.function.Function;
 
 final
-public class DAGUtil {
+class DAGUtil {
     private DAGUtil() {
     }
 

@@ -13,7 +13,9 @@ import static org.cossbow.dag.DAGUtil.toImmutable;
  *
  * @author jiangjianjun5
  */
+final
 public class DAGGraph<Key> {
+
     private final Set<Key> allNodes;
 
     private final Set<Key> heads, tails;
@@ -22,7 +24,7 @@ public class DAGGraph<Key> {
     private final Map<Key, Set<Key>> reverseEdgesMap;
 
     public DAGGraph(Collection<Key> allNodes,
-                    Collection<Map.Entry<Key, Key>> edges) {
+                    Iterable<Map.Entry<Key, Key>> edges) {
         if (null == allNodes || allNodes.isEmpty()) {
             throw new IllegalArgumentException("keys empty");
         }
@@ -56,8 +58,8 @@ public class DAGGraph<Key> {
 
         this.edgesMap = toImmutable(edgesMap);
         this.reverseEdgesMap = toImmutable(reverseEdgesMap);
-        this.tails = DAGUtil.subtract(this.allNodes, this.edgesMap.keySet());
-        this.heads = DAGUtil.subtract(this.allNodes, this.reverseEdgesMap.keySet());
+        this.tails = Set.copyOf(DAGUtil.subtract(this.allNodes, this.edgesMap.keySet()));
+        this.heads = Set.copyOf(DAGUtil.subtract(this.allNodes, this.reverseEdgesMap.keySet()));
     }
 
     private boolean isLegalAddEdge(
@@ -86,10 +88,6 @@ public class DAGGraph<Key> {
         }
 
         return true;
-    }
-
-    private void addEdge(Key from, Key to, Map<Key, Set<Key>> map) {
-        map.computeIfAbsent(from, k -> new HashSet<>()).add(to);
     }
 
 

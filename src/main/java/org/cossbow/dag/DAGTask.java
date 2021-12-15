@@ -1,21 +1,16 @@
 package org.cossbow.dag;
 
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Objects;
+import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.BiFunction;
 
-
+final
 public class DAGTask<Key, Data> {
 
     private final DAGGraph<Key> graph;
     private final BiFunction<Key, Data, CompletableFuture<DAGResult<Data>>> taskHandler;
-    private final NodeParamHandler<Key, Data> paramHandler;
-    private final BiFunction<Data, Map<Key, DAGResult<Data>>, DAGResult<Data>> resultHandler;
-    private final NodeListener<Key, Data> listener;
+    private final ParamHandler<Key, Data> paramHandler;
     private final Data input;
 
 
@@ -25,23 +20,28 @@ public class DAGTask<Key, Data> {
     // 执行结果集
     private final Map<Key, DAGResult<Data>> results =
             new ConcurrentHashMap<>();
+    // 只读结果集
+    private final Map<Key, DAGResult<Data>> immutableResult =
+            Collections.unmodifiableMap(results);
+    // Task最终结果future
+    private volatile CompletableFuture<Map<Key, DAGResult<Data>>> future;
 
-    DAGTask(DAGGraph<Key> graph,
-            BiFunction<Key, Data, CompletableFuture<DAGResult<Data>>> taskHandler,
-            NodeParamHandler<Key, Data> paramHandler,
-            NodeListener<Key, Data> listener,
-            Data input,
-            BiFunction<Data, Map<Key, DAGResult<Data>>, DAGResult<Data>> resultHandler) {
+    public DAGTask(DAGGraph<Key> graph,
+                   BiFunction<Key, Data, CompletableFuture<DAGResult<Data>>> taskHandler,
+                   ParamHandler<Key, Data> paramHandler,
+                   Data input) {
         this.graph = Objects.requireNonNull(graph);
         this.taskHandler = Objects.requireNonNull(taskHandler);
         this.paramHandler = Objects.requireNonNull(paramHandler);
-        this.resultHandler = Objects.requireNonNull(resultHandler);
-        this.listener = listener;
         this.input = Objects.requireNonNull(input);
     }
 
-    private CompletableFuture<?> execHandler(Key key) {
+    private Data dependentResults(Key key) {
         var prev = graph.prev(key);
+        if (prev.isEmpty()) {
+            return paramHandler.form(key, input, Map.of());
+        }
+
         var resultMap = new HashMap<Key, DAGResult<Data>>(prev.size());
         for (Key k : prev) {
             var v = results.get(k);
@@ -49,17 +49,13 @@ public class DAGTask<Key, Data> {
                 resultMap.put(k, v);
             }
         }
-        var args = paramHandler.form(key, input, resultMap);
-        return taskHandler.apply(key, args).whenComplete((r, e) -> {
-            if (null == e) {
-                results.put(key, r);
-                if (null != listener) {
-                    listener.onSuccess(key, r);
-                }
-            } else if (null != listener) {
-                listener.onError(key, e);
-            }
-        });
+        return paramHandler.form(key, input, resultMap);
+    }
+
+    private CompletableFuture<?> execHandler(Key key) {
+        var args = dependentResults(key);
+        return taskHandler.apply(key, args)
+                .thenAccept(r -> results.put(key, r));
     }
 
     private CompletableFuture<?> execOne(Key key) {
@@ -82,73 +78,21 @@ public class DAGTask<Key, Data> {
         }
     }
 
-    public CompletableFuture<DAGResult<Data>> call() {
-        return execBatch(graph.tails())
-                .thenApply(v -> resultHandler.apply(input, results));
+    private CompletableFuture<Map<Key, DAGResult<Data>>> doCall() {
+        return execBatch(graph.tails()).thenApply(v -> immutableResult);
     }
 
-    public boolean started(Key key) {
-        return futures.containsKey(key);
-    }
-
-    public boolean complete(Key key) {
-        return results.containsKey(key);
-    }
-
-
-    //
-
-    public static <K, D> Builder<K, D> builder(DAGGraph<K> graph) {
-        return new Builder<K, D>().graph(graph);
-    }
-
-    public static class Builder<K, D> {
-        private DAGGraph<K> graph;
-        private BiFunction<K, D, CompletableFuture<DAGResult<D>>> taskHandler;
-        private NodeParamHandler<K, D> paramHandler;
-        private NodeListener<K, D> listener;
-        private D input;
-        private BiFunction<D, Map<K, DAGResult<D>>, DAGResult<D>> resultHandler;
-
-        public Builder<K, D> graph(DAGGraph<K> graph) {
-            this.graph = graph;
-            return this;
+    public CompletableFuture<Map<Key, DAGResult<Data>>> call() {
+        var f = future;
+        if (null == f) {
+            synchronized (this) {
+                f = future;
+                if (null == f) {
+                    f = future = doCall();
+                }
+            }
         }
-
-        public Builder<K, D> taskHandler(BiFunction<K, D, CompletableFuture<DAGResult<D>>> taskHandler) {
-            this.taskHandler = taskHandler;
-            return this;
-        }
-
-        public Builder<K, D> inputHandler(NodeParamHandler<K, D> paramHandler) {
-            this.paramHandler = paramHandler;
-            return this;
-        }
-
-        public Builder<K, D> listener(NodeListener<K, D> listener) {
-            this.listener = listener;
-            return this;
-        }
-
-        public Builder<K, D> input(D input) {
-            this.input = input;
-            return this;
-        }
-
-        public Builder<K, D> resultHandler(
-                BiFunction<D, Map<K, DAGResult<D>>, DAGResult<D>> resultHandler) {
-            this.resultHandler = resultHandler;
-            return this;
-        }
-
-        public DAGTask<K, D> build() {
-            return new DAGTask<>(graph,
-                    taskHandler,
-                    paramHandler,
-                    listener,
-                    input,
-                    resultHandler);
-        }
+        return f;
     }
 
 }

@@ -13,4 +13,12 @@ public class DAGResult<D> {
         this.output = result;
         this.error = error;
     }
+
+    public DAGResult(D output) {
+        this(true, output, null);
+    }
+
+    public DAGResult(String error) {
+        this(false, null, error);
+    }
 }
