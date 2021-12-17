@@ -2,6 +2,7 @@ package org.cossbow.dag;
 
 import org.junit.Test;
 
+import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -9,6 +10,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 
 public class DAGTaskTest {
 
@@ -41,26 +43,30 @@ public class DAGTaskTest {
     public void testCalc() {
         final var executor = CompletableFuture.delayedExecutor(500, TimeUnit.MILLISECONDS,
                 EXECUTOR);
-        var task = new DAGTask<>(graph, (k, i) -> {
-            return CompletableFuture.supplyAsync(() -> {
-                System.out.println(k + " return " + (i + 1));
-                return new DAGResult<>(i + 1);
-            }, executor);
-        }, (k, t, results) -> {
-            System.out.println(k + " input " + results);
-            if (results.isEmpty()) return t;
-            int sum = 0;
-            for (var v : results.values()) {
-                if (v.isSuccess()) sum += v.getOutput();
-            }
-            return sum;
-        }, 1);
-        var re = task.call().join();
+        final var seq = new AtomicInteger();
 
-        System.out.println(re);
+        var handler = new DAGNodeHandler<Integer, String, Integer>(
+                seq::incrementAndGet, (id, currentKey, input, results) -> {
+            System.out.println(currentKey + "-" + id + " input " + results);
+            var args = results.isEmpty() ? input : sumDAGResults(results.values());
+            return DAGResult.success(args);
+        }, (id, k, input) -> CompletableFuture.supplyAsync(() -> {
+            System.out.println(k + " return " + (input + 1));
+            return DAGResult.success(input + 1);
+        }, executor));
+        var task = new DAGTask<>(graph, handler, 1);
+        EXECUTOR.execute(task);
+        EXECUTOR.execute(task);
+        var re = task.join();
+        var sum = sumDAGResults(re.values());
+        System.out.println(sum);
+
 
         EXECUTOR.shutdown();
     }
 
+    static int sumDAGResults(Collection<DAGResult<Integer>> results) {
+        return results.stream().mapToInt(DAGResult::getData).sum();
+    }
 
 }

@@ -1,18 +1,37 @@
 package org.cossbow.dag;
 
-import java.util.*;
+import java.lang.invoke.MethodHandles;
+import java.lang.invoke.VarHandle;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.function.BiFunction;
 
 final
-public class DAGTask<Key, Data> {
+public class DAGTask<Key, Data>
+        extends CompletableFuture<Map<Key, DAGResult<Data>>>
+        implements Runnable {
+
+    private static final VarHandle STARTED;
+
+    static {
+        MethodHandles.Lookup l = MethodHandles.lookup();
+        try {
+            STARTED = l.findVarHandle(DAGTask.class, "started", boolean.class);
+        } catch (ReflectiveOperationException e) {
+            throw new ExceptionInInitializerError(e);
+        }
+    }
+
+
+    //
 
     private final DAGGraph<Key> graph;
-    private final BiFunction<Key, Data, CompletableFuture<DAGResult<Data>>> taskHandler;
-    private final ParamHandler<Key, Data> paramHandler;
+    private final TriFunction<Key, Data, Map<Key, DAGResult<Data>>,
+            CompletableFuture<DAGResult<Data>>> handler;
     private final Data input;
-
 
     // 运行状态Future
     private final Map<Key, CompletableFuture<?>> futures =
@@ -20,26 +39,23 @@ public class DAGTask<Key, Data> {
     // 执行结果集
     private final Map<Key, DAGResult<Data>> results =
             new ConcurrentHashMap<>();
-    // 只读结果集
-    private final Map<Key, DAGResult<Data>> immutableResult =
-            Collections.unmodifiableMap(results);
-    // Task最终结果future
-    private volatile CompletableFuture<Map<Key, DAGResult<Data>>> future;
+    // 是否已经启动
+    private volatile boolean started = false;
+
 
     public DAGTask(DAGGraph<Key> graph,
-                   BiFunction<Key, Data, CompletableFuture<DAGResult<Data>>> taskHandler,
-                   ParamHandler<Key, Data> paramHandler,
+                   TriFunction<Key, Data, Map<Key, DAGResult<Data>>,
+                           CompletableFuture<DAGResult<Data>>> handler,
                    Data input) {
         this.graph = Objects.requireNonNull(graph);
-        this.taskHandler = Objects.requireNonNull(taskHandler);
-        this.paramHandler = Objects.requireNonNull(paramHandler);
+        this.handler = Objects.requireNonNull(handler);
         this.input = Objects.requireNonNull(input);
     }
 
-    private Data dependentResults(Key key) {
+    private Map<Key, DAGResult<Data>> dependentResults(Key key) {
         var prev = graph.prev(key);
         if (prev.isEmpty()) {
-            return paramHandler.form(key, input, Map.of());
+            return Map.of();
         }
 
         var resultMap = new HashMap<Key, DAGResult<Data>>(prev.size());
@@ -49,13 +65,12 @@ public class DAGTask<Key, Data> {
                 resultMap.put(k, v);
             }
         }
-        return paramHandler.form(key, input, resultMap);
+        return resultMap;
     }
 
     private CompletableFuture<?> execHandler(Key key) {
-        var args = dependentResults(key);
-        return taskHandler.apply(key, args)
-                .thenAccept(r -> results.put(key, r));
+        return handler.apply(key, input, dependentResults(key))
+                .thenAccept(r -> this.results.put(key, r));
     }
 
     private CompletableFuture<?> execOne(Key key) {
@@ -78,21 +93,31 @@ public class DAGTask<Key, Data> {
         }
     }
 
-    private CompletableFuture<Map<Key, DAGResult<Data>>> doCall() {
-        return execBatch(graph.tails()).thenApply(v -> immutableResult);
+    private void execute() {
+        try {
+            execBatch(graph.tails()).whenComplete((v, e) -> {
+                if (null == e) {
+                    complete(results);
+                } else {
+                    completeExceptionally(e);
+                }
+            });
+        } catch (Throwable e) {
+            completeExceptionally(e);
+        }
     }
 
-    public CompletableFuture<Map<Key, DAGResult<Data>>> call() {
-        var f = future;
-        if (null == f) {
-            synchronized (this) {
-                f = future;
-                if (null == f) {
-                    f = future = doCall();
-                }
-            }
+
+    public void run() {
+        if (!STARTED.compareAndSet(this, false, true)) {
+            return;
         }
-        return f;
+
+        execute();
+    }
+
+    public boolean isStarted() {
+        return started;
     }
 
 }

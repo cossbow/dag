@@ -2,9 +2,6 @@ package org.cossbow.dag;
 
 import java.util.*;
 
-import static org.cossbow.dag.DAGUtil.hashSet;
-import static org.cossbow.dag.DAGUtil.toImmutable;
-
 
 /**
  * <h3>有向无环图</h3>
@@ -52,12 +49,12 @@ public class DAGGraph<Key> {
             }
             queue.clear();
 
-            edgesMap.computeIfAbsent(from, hashSet()).add(to);
-            reverseEdgesMap.computeIfAbsent(to, hashSet()).add(from);
+            edgesMap.computeIfAbsent(from, DAGUtil.hashSet()).add(to);
+            reverseEdgesMap.computeIfAbsent(to, DAGUtil.hashSet()).add(from);
         }
 
-        this.edgesMap = toImmutable(edgesMap);
-        this.reverseEdgesMap = toImmutable(reverseEdgesMap);
+        this.edgesMap = DAGUtil.toImmutable(edgesMap);
+        this.reverseEdgesMap = DAGUtil.toImmutable(reverseEdgesMap);
         this.tails = Set.copyOf(DAGUtil.subtract(this.allNodes, this.edgesMap.keySet()));
         this.heads = Set.copyOf(DAGUtil.subtract(this.allNodes, this.reverseEdgesMap.keySet()));
     }
