@@ -17,16 +17,18 @@ public class DAGTaskTest {
 
     static final ExecutorService EXECUTOR = Executors.newFixedThreadPool(16);
 
-
+    final HashSet<String> nodes;
+    final List<Map.Entry<String, String>> edges;
     final DAGGraph<String> graph;
 
     {
-        var nodes = new HashSet<String>();
+        nodes = new HashSet<>();
         for (int i = 1; i <= 6; i++) {
             var key = "N-" + i;
             nodes.add(key);
         }
-        var edges = List.of(
+
+        edges = List.of(
                 Map.entry("N-1", "N-2"),
                 Map.entry("N-1", "N-3"),
                 Map.entry("N-2", "N-4"),

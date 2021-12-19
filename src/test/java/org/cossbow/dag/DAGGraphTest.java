@@ -11,7 +11,7 @@ public class DAGGraphTest {
 
     @Test
     public void testLegal() {
-        var nodes = Set.of(1, 2, 3, 4);
+        var nodes = List.of(1, 2, 3, 4);
         var edges = List.of(
                 Map.entry(1, 2),
                 Map.entry(1, 3),
@@ -19,24 +19,51 @@ public class DAGGraphTest {
                 Map.entry(3, 4)
         );
         new DAGGraph<>(nodes, edges);
+
+        var re = DAGUtil.checkAcyclic(nodes, edges);
+        Assert.assertTrue(re.getKey());
+        Assert.assertEquals(nodes, re.getValue());
     }
 
     @Test
-    public void testIllegal() {
-        var nodes = Set.of(1, 2, 3, 4);
+    public void testIllegal1() {
+        var nodes = List.of(1, 2, 3, 4);
         var edges = List.of(
                 Map.entry(1, 2),
                 Map.entry(1, 3),
                 Map.entry(2, 4),
                 Map.entry(3, 4),
-                Map.entry(4, 1)
+                Map.entry(4, 3)
         );
         try {
             new DAGGraph<>(nodes, edges);
             Assert.fail("The graph is illegal");
         } catch (IllegalArgumentException e) {
-            Assert.assertEquals("Serious error: edge(4 -> 1) is invalid, cause cycle！", e.getMessage());
         }
+
+        var re = DAGUtil.checkAcyclic(nodes, edges);
+        Assert.assertFalse(re.getKey());
+    }
+
+    @Test
+    public void testIllegal2() {
+        var nodes = List.of(1, 2, 3, 4, 5);
+        var edges = List.of(
+                Map.entry(1, 2),
+                Map.entry(1, 3),
+                Map.entry(2, 4),
+                Map.entry(3, 4),
+                Map.entry(4, 5),
+                Map.entry(5, 1)
+        );
+        try {
+            new DAGGraph<>(nodes, edges);
+            Assert.fail("The graph is illegal");
+        } catch (IllegalArgumentException e) {
+        }
+
+        var re = DAGUtil.checkAcyclic(nodes, edges);
+        Assert.assertFalse(re.getKey());
     }
 
     @Test

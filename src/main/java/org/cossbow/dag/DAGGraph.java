@@ -17,8 +17,8 @@ public class DAGGraph<Key> {
 
     private final Set<Key> heads, tails;
 
-    private final Map<Key, Set<Key>> edgesMap;
-    private final Map<Key, Set<Key>> reverseEdgesMap;
+    private final Map<Key, Set<Key>> forwardIndex;
+    private final Map<Key, Set<Key>> reverseIndex;
 
     public DAGGraph(Collection<Key> allNodes,
                     Iterable<Map.Entry<Key, Key>> edges) {
@@ -30,8 +30,8 @@ public class DAGGraph<Key> {
             throw new IllegalArgumentException("Has duplicate Key");
         }
 
-        var edgesMap = new HashMap<Key, Set<Key>>();
-        var reverseEdgesMap = new HashMap<Key, Set<Key>>();
+        var forward = new HashMap<Key, Set<Key>>();
+        var reverse = new HashMap<Key, Set<Key>>();
         var queue = new LinkedList<Key>();
         for (var edge : edges) {
             Key from = edge.getKey(), to = edge.getValue();
@@ -43,20 +43,20 @@ public class DAGGraph<Key> {
                 throw new IllegalArgumentException("Key not exists: " + to);
             }
 
-            if (!isLegalAddEdge(allNodes.size(), queue, edgesMap, from, to)) {
+            if (!isLegalAddEdge(allNodes.size(), queue, forward, from, to)) {
                 throw new IllegalArgumentException(
                         "Serious error: edge(" + from + " -> " + to + ") is invalid, cause cycle！");
             }
             queue.clear();
 
-            edgesMap.computeIfAbsent(from, DAGUtil.hashSet()).add(to);
-            reverseEdgesMap.computeIfAbsent(to, DAGUtil.hashSet()).add(from);
+            forward.computeIfAbsent(from, DAGUtil.hashSet()).add(to);
+            reverse.computeIfAbsent(to, DAGUtil.hashSet()).add(from);
         }
 
-        this.edgesMap = DAGUtil.toImmutable(edgesMap);
-        this.reverseEdgesMap = DAGUtil.toImmutable(reverseEdgesMap);
-        this.tails = Set.copyOf(DAGUtil.subtract(this.allNodes, this.edgesMap.keySet()));
-        this.heads = Set.copyOf(DAGUtil.subtract(this.allNodes, this.reverseEdgesMap.keySet()));
+        this.forwardIndex = DAGUtil.toImmutable(forward);
+        this.reverseIndex = DAGUtil.toImmutable(reverse);
+        this.tails = Set.copyOf(DAGUtil.subtract(this.allNodes, this.forwardIndex.keySet()));
+        this.heads = Set.copyOf(DAGUtil.subtract(this.allNodes, this.reverseIndex.keySet()));
     }
 
     private boolean isLegalAddEdge(
@@ -103,11 +103,11 @@ public class DAGGraph<Key> {
     }
 
     public Set<Key> prev(Key key) {
-        return reverseEdgesMap.getOrDefault(key, Set.of());
+        return reverseIndex.getOrDefault(key, Set.of());
     }
 
     public Set<Key> next(Key key) {
-        return edgesMap.getOrDefault(key, Set.of());
+        return forwardIndex.getOrDefault(key, Set.of());
     }
 
 }
