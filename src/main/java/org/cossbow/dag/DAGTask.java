@@ -10,8 +10,8 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 
 final
-public class DAGTask<Key, Data>
-        extends CompletableFuture<Map<Key, DAGResult<Data>>>
+public class DAGTask<Key, Data, Result>
+        extends CompletableFuture<Map<Key, Result>>
         implements Runnable {
 
     private static final VarHandle STARTED;
@@ -29,36 +29,36 @@ public class DAGTask<Key, Data>
     //
 
     private final DAGGraph<Key> graph;
-    private final TriFunction<Key, Data, Map<Key, DAGResult<Data>>,
-            CompletableFuture<DAGResult<Data>>> handler;
+    private final TriFunction<Key, Data, Map<Key, Result>,
+            CompletableFuture<Result>> handler;
     private final Data input;
 
     // 运行状态Future
     private final Map<Key, CompletableFuture<?>> futures =
             new ConcurrentHashMap<>();
     // 执行结果集
-    private final Map<Key, DAGResult<Data>> results =
+    private final Map<Key, Result> results =
             new ConcurrentHashMap<>();
     // 是否已经启动
     private volatile boolean started = false;
 
 
     public DAGTask(DAGGraph<Key> graph,
-                   TriFunction<Key, Data, Map<Key, DAGResult<Data>>,
-                           CompletableFuture<DAGResult<Data>>> handler,
+                   TriFunction<Key, Data, Map<Key, Result>,
+                           CompletableFuture<Result>> handler,
                    Data input) {
         this.graph = Objects.requireNonNull(graph);
         this.handler = Objects.requireNonNull(handler);
         this.input = Objects.requireNonNull(input);
     }
 
-    private Map<Key, DAGResult<Data>> dependentResults(Key key) {
+    private Map<Key, Result> dependentResults(Key key) {
         var prev = graph.prev(key);
         if (prev.isEmpty()) {
             return Map.of();
         }
 
-        var resultMap = new HashMap<Key, DAGResult<Data>>(prev.size());
+        var resultMap = new HashMap<Key, Result>(prev.size());
         for (Key k : prev) {
             var v = results.get(k);
             if (null != v) {
