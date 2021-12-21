@@ -33,24 +33,14 @@ class DAGUtil {
         return Map.copyOf(dst);
     }
 
-    public static <Key> Map.Entry<Boolean, List<Key>> checkAcyclic(
-            Collection<Key> keySet,
-            Collection<Map.Entry<Key, Key>> edges) {
-        var forward = new HashMap<Key, Set<Key>>(edges.size());
-        var reverse = new HashMap<Key, Set<Key>>(edges.size());
-        for (var edge : edges) {
-            Key from = edge.getKey(), to = edge.getValue();
-            if (Objects.equals(from, to)) {
-                return Map.entry(Boolean.FALSE, List.of());
-            }
-            forward.computeIfAbsent(from, hashSet()).add(to);
-            reverse.computeIfAbsent(to, hashSet()).add(from);
-        }
-
-        var result = new ArrayList<Key>(keySet.size());
-        var zeroInDegree = new ArrayDeque<Key>(keySet.size());
+    public static <Key> Map.Entry<Boolean, List<Key>> topologicalSort(
+            Collection<Key> keys,
+            Map<Key, Set<Key>> forward,
+            Map<Key, Set<Key>> reverse) {
+        var result = new ArrayList<Key>(keys.size());
+        var zeroInDegree = new ArrayDeque<Key>(keys.size());
         var hasInDegree = new HashMap<Key, Counter>();
-        for (Key key : keySet) {
+        for (Key key : keys) {
             var prev = reverse.get(key);
             int size = sizeOf(prev);
             if (size == 0) {
@@ -82,32 +72,35 @@ class DAGUtil {
         return Map.entry(hasInDegree.isEmpty(), result);
     }
 
-
-    static class Counter {
-        private long value;
-
-        public Counter() {
+    public static <Key> Map.Entry<Boolean, List<Key>> topologicalSort(
+            Collection<Key> keys,
+            Collection<Map.Entry<Key, Key>> edges) {
+        var forward = new HashMap<Key, Set<Key>>(edges.size());
+        var reverse = new HashMap<Key, Set<Key>>(edges.size());
+        for (var edge : edges) {
+            Key from = edge.getKey(), to = edge.getValue();
+            if (Objects.equals(from, to)) {
+                return Map.entry(false, List.of());
+            }
+            forward.computeIfAbsent(from, hashSet()).add(to);
+            reverse.computeIfAbsent(to, hashSet()).add(from);
         }
 
-        public Counter(long value) {
-            this.value = value;
-        }
-
-        public long get() {
-            return value;
-        }
-
-        public long incAndGet() {
-            return ++value;
-        }
-
-        public long decAndGet() {
-            return --value;
-        }
-
-        @Override
-        public String toString() {
-            return "Counter(" + value + ')';
-        }
+        return topologicalSort(keys, forward, reverse);
     }
+
+    public static <Key> boolean checkAcyclic(
+            Collection<Key> keys,
+            Map<Key, Set<Key>> forward,
+            Map<Key, Set<Key>> reverse) {
+        return topologicalSort(keys, forward, reverse).getKey();
+    }
+
+    public static <Key> boolean checkAcyclic(
+            Collection<Key> keys,
+            Collection<Map.Entry<Key, Key>> edges) {
+        return topologicalSort(keys, edges).getKey();
+    }
+
+
 }

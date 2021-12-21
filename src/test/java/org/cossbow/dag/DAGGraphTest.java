@@ -20,7 +20,7 @@ public class DAGGraphTest {
         );
         new DAGGraph<>(nodes, edges);
 
-        var re = DAGUtil.checkAcyclic(nodes, edges);
+        var re = DAGUtil.topologicalSort(nodes, edges);
         Assert.assertTrue(re.getKey());
         Assert.assertEquals(nodes, re.getValue());
     }
@@ -41,7 +41,7 @@ public class DAGGraphTest {
         } catch (IllegalArgumentException e) {
         }
 
-        var re = DAGUtil.checkAcyclic(nodes, edges);
+        var re = DAGUtil.topologicalSort(nodes, edges);
         Assert.assertFalse(re.getKey());
     }
 
@@ -62,7 +62,7 @@ public class DAGGraphTest {
         } catch (IllegalArgumentException e) {
         }
 
-        var re = DAGUtil.checkAcyclic(nodes, edges);
+        var re = DAGUtil.topologicalSort(nodes, edges);
         Assert.assertFalse(re.getKey());
     }
 
