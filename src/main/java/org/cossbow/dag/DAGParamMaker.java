@@ -3,7 +3,7 @@ package org.cossbow.dag;
 import java.util.Map;
 
 @FunctionalInterface
-public interface DAGParamMaker<ID, K, D> {
+public interface DAGParamMaker<ID, K, D, R> {
 
     /**
      * @param subtaskID        子任务ID
@@ -12,8 +12,8 @@ public interface DAGParamMaker<ID, K, D> {
      * @param dependentResults 上游节点的结果集，Map的Key是上游节点的Key
      * @return 返回成功，包含输入给节点的参数；返回失败，包含错误信息
      */
-    DAGResult<D> checkAndForm(
+    R checkAndForm(
             ID subtaskID, K currentKey, D input,
-            Map<K, DAGResult<D>> dependentResults);
+            Map<K, R> dependentResults);
 
 }

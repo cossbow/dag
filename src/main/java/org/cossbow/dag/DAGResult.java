@@ -1,12 +1,13 @@
 package org.cossbow.dag;
 
-import lombok.Data;
-
-@Data
 public class DAGResult<D> {
     private boolean success;
     private D data;
     private String error;
+
+    public DAGResult() {
+        this(true, null, null);
+    }
 
     public DAGResult(boolean success, D result, String error) {
         this.success = success;
@@ -20,6 +21,33 @@ public class DAGResult<D> {
 
     public DAGResult(String error) {
         this(false, null, error);
+    }
+
+
+    //
+
+    public boolean isSuccess() {
+        return success;
+    }
+
+    public void setSuccess(boolean success) {
+        this.success = success;
+    }
+
+    public D getData() {
+        return data;
+    }
+
+    public void setData(D data) {
+        this.data = data;
+    }
+
+    public String getError() {
+        return error;
+    }
+
+    public void setError(String error) {
+        this.error = error;
     }
 
 

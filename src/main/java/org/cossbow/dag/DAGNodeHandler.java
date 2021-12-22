@@ -11,10 +11,10 @@ public class DAGNodeHandler<ID, K, D>
 
     final Supplier<ID> IDGenerator;
     final TriFunction<ID, K, D, CompletableFuture<DAGResult<D>>> executor;
-    final DAGParamMaker<ID, K, D> paramMaker;
+    final DAGParamMaker<ID, K, D, DAGResult<D>> paramMaker;
 
     public DAGNodeHandler(Supplier<ID> IDGenerator,
-                          DAGParamMaker<ID, K, D> paramMaker,
+                          DAGParamMaker<ID, K, D, DAGResult<D>> paramMaker,
                           TriFunction<ID, K, D, CompletableFuture<DAGResult<D>>> executor) {
         this.IDGenerator = IDGenerator;
         this.executor = executor;
