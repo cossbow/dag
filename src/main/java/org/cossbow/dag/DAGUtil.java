@@ -2,6 +2,7 @@
 package org.cossbow.dag;
 
 import java.util.*;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
 
 final
@@ -39,7 +40,7 @@ class DAGUtil {
             Map<Key, Set<Key>> reverse) {
         var result = new ArrayList<Key>(keys.size());
         var zeroInDegree = new ArrayDeque<Key>(keys.size());
-        var hasInDegree = new HashMap<Key, Counter>();
+        var hasInDegree = new HashMap<Key, AtomicInteger>();
         for (Key key : keys) {
             var prev = reverse.get(key);
             int size = sizeOf(prev);
@@ -47,7 +48,7 @@ class DAGUtil {
                 zeroInDegree.add(key);
                 result.add(key);
             } else {
-                hasInDegree.put(key, new Counter(size));
+                hasInDegree.put(key, new AtomicInteger(size));
             }
         }
         if (zeroInDegree.isEmpty()) {
@@ -60,7 +61,7 @@ class DAGUtil {
             var next = forward.get(key);
             if (sizeOf(next) > 0) {
                 for (Key nk : next) {
-                    if (hasInDegree.get(nk).decAndGet() == 0) {
+                    if (hasInDegree.get(nk).decrementAndGet() == 0) {
                         result.add(nk);
                         zeroInDegree.add(nk);
                         hasInDegree.remove(nk);

@@ -48,15 +48,15 @@ public class DAGTaskTest {
         final var seq = new AtomicInteger();
 
         var handler = new DAGNodeHandler<Integer, String, Integer>(
-                seq::incrementAndGet, (id, currentKey, input, results) -> {
-            System.out.println(currentKey + "-" + id + " input " + results);
-            var args = results.isEmpty() ? input : sumDAGResults(results.values());
+                seq::incrementAndGet, (id, node, results) -> {
+            System.out.println("Node-" + node + "/Subtask-" + id + " input " + results);
+            var args = results.isEmpty() ? 1 : sumDAGResults(results.values());
             return DAGResult.success(args);
-        }, (id, k, input) -> CompletableFuture.supplyAsync(() -> {
-            System.out.println(k + " return " + (input + 1));
+        }, (id, node, input) -> CompletableFuture.supplyAsync(() -> {
+            System.out.println("Node-" + node + "/Subtask-" + id + " return " + (input + 1));
             return DAGResult.success(input + 1);
         }, executor));
-        var task = new DAGTask<>(graph, handler, 1);
+        var task = new DAGTask<>(graph, handler);
         EXECUTOR.execute(task);
         EXECUTOR.execute(task);
         var re = task.join();

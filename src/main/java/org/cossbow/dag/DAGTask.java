@@ -8,9 +8,10 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.BiFunction;
 
 final
-public class DAGTask<Key, Data, Result>
+public class DAGTask<Key, Result>
         extends CompletableFuture<Map<Key, Result>>
         implements Runnable {
 
@@ -29,9 +30,9 @@ public class DAGTask<Key, Data, Result>
     //
 
     private final DAGGraph<Key> graph;
-    private final TriFunction<Key, Data, Map<Key, Result>,
+    private final BiFunction<Key, Map<Key, Result>,
             CompletableFuture<Result>> handler;
-    private final Data input;
+
 
     // 运行状态Future
     private final Map<Key, CompletableFuture<?>> futures =
@@ -44,12 +45,10 @@ public class DAGTask<Key, Data, Result>
 
 
     public DAGTask(DAGGraph<Key> graph,
-                   TriFunction<Key, Data, Map<Key, Result>,
-                           CompletableFuture<Result>> handler,
-                   Data input) {
+                   BiFunction<Key, Map<Key, Result>,
+                           CompletableFuture<Result>> handler) {
         this.graph = Objects.requireNonNull(graph);
         this.handler = Objects.requireNonNull(handler);
-        this.input = Objects.requireNonNull(input);
     }
 
     private Map<Key, Result> dependentResults(Key key) {
@@ -69,7 +68,7 @@ public class DAGTask<Key, Data, Result>
     }
 
     private CompletableFuture<?> execHandler(Key key) {
-        return handler.apply(key, input, dependentResults(key))
+        return handler.apply(key, dependentResults(key))
                 .thenAccept(r -> this.results.put(key, r));
     }
 
