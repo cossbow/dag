@@ -3,7 +3,9 @@ package org.cossbow.dag;
 
 import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Consumer;
 import java.util.function.Function;
+import java.util.function.Supplier;
 
 final
 class DAGUtil {
@@ -35,7 +37,7 @@ class DAGUtil {
     }
 
     public static <Key> Map.Entry<Boolean, List<Key>> topologicalSort(
-            Collection<Key> keys,
+            Set<Key> keys,
             Map<Key, Set<Key>> forward,
             Map<Key, Set<Key>> reverse) {
         var result = new ArrayList<Key>(keys.size());
@@ -73,35 +75,89 @@ class DAGUtil {
         return Map.entry(hasInDegree.isEmpty(), result);
     }
 
-    public static <Key> Map.Entry<Boolean, List<Key>> topologicalSort(
-            Collection<Key> keys,
-            Collection<Map.Entry<Key, Key>> edges) {
+    static <Key, R> R convert(Set<Key> keys,
+                              Collection<Map.Entry<Key, Key>> edges,
+                              TriFunction<Set<Key>,
+                                      Map<Key, Set<Key>>,
+                                      Map<Key, Set<Key>>, R> mapping,
+                              R failReturn) {
         var forward = new HashMap<Key, Set<Key>>(edges.size());
         var reverse = new HashMap<Key, Set<Key>>(edges.size());
         for (var edge : edges) {
             Key from = edge.getKey(), to = edge.getValue();
             if (Objects.equals(from, to)) {
-                return Map.entry(false, List.of());
+                return failReturn;
             }
             forward.computeIfAbsent(from, hashSet()).add(to);
             reverse.computeIfAbsent(to, hashSet()).add(from);
         }
+        return mapping.apply(Set.copyOf(keys), forward, reverse);
+    }
 
-        return topologicalSort(keys, forward, reverse);
+    public static <Key> Map.Entry<Boolean, List<Key>> topologicalSort(
+            Set<Key> keys,
+            Collection<Map.Entry<Key, Key>> edges) {
+
+        return convert(keys, edges, DAGUtil::topologicalSort,
+                Map.entry(false, List.of()));
     }
 
     public static <Key> boolean checkAcyclic(
-            Collection<Key> keys,
+            Set<Key> keys,
             Map<Key, Set<Key>> forward,
             Map<Key, Set<Key>> reverse) {
         return topologicalSort(keys, forward, reverse).getKey();
     }
 
     public static <Key> boolean checkAcyclic(
-            Collection<Key> keys,
+            Set<Key> keys,
             Collection<Map.Entry<Key, Key>> edges) {
         return topologicalSort(keys, edges).getKey();
     }
 
+
+    //
+
+    public static <Key> void bfs(
+            Set<Key> keys,
+            Map<Key, Set<Key>> forward,
+            Map<Key, Set<Key>> reverse,
+            Consumer<Key> consumer) {
+        var traveled = new HashMap<Key, Boolean>(keys.size());
+        var heads = subtract(keys, reverse.keySet());
+        var queue = new ArrayDeque<>(heads);
+        for (Key head : heads) {
+            traveled.put(head, Boolean.FALSE);
+        }
+        while (queue.size() > 0) {
+            var ck = queue.pollLast();
+            consumer.accept(ck);
+            var next = forward.get(ck);
+            if (null == next || next.isEmpty()) {
+                // 没有后面了
+            } else {
+                // 发现后继
+                for (Key nk : next) {
+                    if (traveled.putIfAbsent(nk, Boolean.FALSE) != null) {
+                        // 已经访问过
+                    } else {
+                        queue.addFirst(nk);
+                    }
+                }
+            }
+            traveled.put(ck, Boolean.TRUE);
+        }
+
+    }
+
+    public static <Key> void bfs(
+            Set<Key> keys,
+            Collection<Map.Entry<Key, Key>> edges,
+            Consumer<Key> consumer) {
+        convert(keys, edges, (keySet, forward, reverse) -> {
+            bfs(keySet, forward, reverse, consumer);
+            return null;
+        }, null);
+    }
 
 }

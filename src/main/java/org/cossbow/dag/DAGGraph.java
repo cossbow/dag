@@ -1,6 +1,7 @@
 package org.cossbow.dag;
 
 import java.util.*;
+import java.util.function.Consumer;
 
 
 /**
@@ -108,6 +109,23 @@ public class DAGGraph<Key> {
 
     public Set<Key> next(Key key) {
         return forwardIndex.getOrDefault(key, Set.of());
+    }
+
+    //
+
+    public void bfs(Consumer<Key> consumer) {
+        var queue = new ArrayDeque<>(heads);
+        var set = new HashMap<Key, Object>(allNodes.size());
+        while (!queue.isEmpty()) {
+            Key ck = queue.pop();
+            var next = next(ck);
+            for (Key nk : next) {
+                if (set.put(nk, Boolean.TRUE) != null) {
+
+                }
+                queue.push(nk);
+            }
+        }
     }
 
 }

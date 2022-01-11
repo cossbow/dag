@@ -20,7 +20,7 @@ public class DAGGraphTest {
         );
         new DAGGraph<>(nodes, edges);
 
-        var re = DAGUtil.topologicalSort(nodes, edges);
+        var re = DAGUtil.topologicalSort(Set.copyOf(nodes), edges);
         Assert.assertTrue(re.getKey());
         Assert.assertEquals(nodes, re.getValue());
     }
@@ -41,7 +41,7 @@ public class DAGGraphTest {
         } catch (IllegalArgumentException e) {
         }
 
-        var re = DAGUtil.topologicalSort(nodes, edges);
+        var re = DAGUtil.topologicalSort(Set.copyOf(nodes), edges);
         Assert.assertFalse(re.getKey());
     }
 
@@ -62,7 +62,7 @@ public class DAGGraphTest {
         } catch (IllegalArgumentException e) {
         }
 
-        var re = DAGUtil.topologicalSort(nodes, edges);
+        var re = DAGUtil.topologicalSort(Set.copyOf(nodes), edges);
         Assert.assertFalse(re.getKey());
     }
 
@@ -107,6 +107,22 @@ public class DAGGraphTest {
         Assert.assertEquals(Set.of(1), r.prev(2));
         Assert.assertEquals(Set.of(1), r.prev(3));
         Assert.assertTrue(r.prev(1).isEmpty());
+    }
+
+    @Test
+    public void bfs() {
+        var nodes = Set.of(1, 2, 3, 4,5,6);
+        var edges = List.of(
+                Map.entry(1, 2),
+                Map.entry(1, 3),
+                Map.entry(2, 4),
+                Map.entry(2, 5),
+                Map.entry(3, 4),
+                Map.entry(5, 6)
+        );
+        DAGUtil.bfs(nodes, edges, i -> {
+            System.out.println(i);
+        });
     }
 
 }

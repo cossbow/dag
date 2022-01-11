@@ -42,7 +42,29 @@ public class DAGTaskTest {
     }
 
     @Test
-    public void testCalc() {
+    public void testTask() {
+        final var executor = CompletableFuture.delayedExecutor(500, TimeUnit.MILLISECONDS,
+                EXECUTOR);
+
+        var task = new DAGTask<String, Integer>(graph, (node, results) -> {
+            System.out.println("Node-" + node + " input: " + results);
+            var input = results.isEmpty() ? 1 :
+                    results.values().stream().mapToInt(Integer::intValue).sum();
+            var output = input + 1;
+            System.out.println("Node-" + node + " return: " + (output));
+            return CompletableFuture.completedFuture(output);
+        });
+        EXECUTOR.execute(task);
+        var re = task.join();
+        var sum = re.values().stream().mapToInt(Integer::intValue).sum();
+        System.out.println(sum);
+
+
+        EXECUTOR.shutdown();
+    }
+
+    @Test
+    public void testHandler() {
         final var executor = CompletableFuture.delayedExecutor(500, TimeUnit.MILLISECONDS,
                 EXECUTOR);
         final var seq = new AtomicInteger();
@@ -50,7 +72,7 @@ public class DAGTaskTest {
         var handler = new DAGNodeHandler<Integer, String, Integer>(
                 seq::incrementAndGet, (id, node, results) -> {
             System.out.println("Node-" + node + "/Subtask-" + id + " input " + results);
-            var args = results.isEmpty() ? 1 : sumDAGResults(results.values());
+            var args = results.isEmpty() ? 1 : results.values().stream().mapToInt(DAGResult::getData).sum();
             return DAGResult.success(args);
         }, (id, node, input) -> CompletableFuture.supplyAsync(() -> {
             System.out.println("Node-" + node + "/Subtask-" + id + " return " + (input + 1));
@@ -60,15 +82,13 @@ public class DAGTaskTest {
         EXECUTOR.execute(task);
         EXECUTOR.execute(task);
         var re = task.join();
-        var sum = sumDAGResults(re.values());
+        var sum = re.values().stream().mapToInt(DAGResult::getData).sum();
         System.out.println(sum);
 
 
         EXECUTOR.shutdown();
     }
 
-    static int sumDAGResults(Collection<DAGResult<Integer>> results) {
-        return results.stream().mapToInt(DAGResult::getData).sum();
-    }
+
 
 }
