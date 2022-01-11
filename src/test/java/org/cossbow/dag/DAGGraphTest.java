@@ -30,10 +30,9 @@ public class DAGGraphTest {
         var nodes = List.of(1, 2, 3, 4);
         var edges = List.of(
                 Map.entry(1, 2),
-                Map.entry(1, 3),
-                Map.entry(2, 4),
+                Map.entry(2, 3),
                 Map.entry(3, 4),
-                Map.entry(4, 3)
+                Map.entry(4, 1)
         );
         try {
             new DAGGraph<>(nodes, edges);
@@ -50,8 +49,7 @@ public class DAGGraphTest {
         var nodes = List.of(1, 2, 3, 4, 5);
         var edges = List.of(
                 Map.entry(1, 2),
-                Map.entry(1, 3),
-                Map.entry(2, 4),
+                Map.entry(2, 3),
                 Map.entry(3, 4),
                 Map.entry(4, 5),
                 Map.entry(5, 1)
@@ -64,6 +62,25 @@ public class DAGGraphTest {
 
         var re = DAGUtil.topologicalSort(Set.copyOf(nodes), edges);
         Assert.assertFalse(re.getKey());
+    }
+
+    @Test
+    public void testIllegal3() {
+        var nodes = List.of(1, 2, 3, 4, 5, 6);
+        var edges = List.of(
+                Map.entry(1, 2),
+                Map.entry(2, 3),
+                Map.entry(3, 4),
+                Map.entry(4, 5),
+                Map.entry(5, 6),
+                Map.entry(6, 1)
+        );
+        try {
+            new DAGGraph<>(nodes, edges);
+            Assert.fail("It's a cyclic graph");
+        } catch (IllegalArgumentException e) {
+            System.out.println(e.getMessage());
+        }
     }
 
     @Test

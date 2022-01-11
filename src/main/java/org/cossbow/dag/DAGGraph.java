@@ -33,7 +33,6 @@ public class DAGGraph<Key> {
 
         var forward = new HashMap<Key, Set<Key>>();
         var reverse = new HashMap<Key, Set<Key>>();
-        var queue = new LinkedList<Key>();
         for (var edge : edges) {
             Key from = edge.getKey(), to = edge.getValue();
 
@@ -44,48 +43,17 @@ public class DAGGraph<Key> {
                 throw new IllegalArgumentException("Key not exists: " + to);
             }
 
-            if (!isLegalAddEdge(allNodes.size(), queue, forward, from, to)) {
-                throw new IllegalArgumentException(
-                        "Serious error: edge(" + from + " -> " + to + ") is invalid, cause cycle！");
-            }
-            queue.clear();
-
             forward.computeIfAbsent(from, DAGUtil.hashSet()).add(to);
             reverse.computeIfAbsent(to, DAGUtil.hashSet()).add(from);
+        }
+        if (!DAGUtil.checkAcyclic(this.allNodes, forward, reverse)) {
+            throw new IllegalArgumentException("Serious error: graph has cyclic");
         }
 
         this.forwardIndex = DAGUtil.toImmutable(forward);
         this.reverseIndex = DAGUtil.toImmutable(reverse);
         this.tails = Set.copyOf(DAGUtil.subtract(this.allNodes, this.forwardIndex.keySet()));
         this.heads = Set.copyOf(DAGUtil.subtract(this.allNodes, this.reverseIndex.keySet()));
-    }
-
-    private boolean isLegalAddEdge(
-            int verticesCount,
-            LinkedList<Key> queue,
-            Map<Key, Set<Key>> edgesMap,
-            Key fromNode, Key toNode) {
-        if (Objects.equals(fromNode, toNode)) {
-            return false;
-        }
-
-        queue.add(toNode);
-
-        while (!queue.isEmpty() && (--verticesCount > 0)) {
-            Key key = queue.poll();
-            var subsequentNodes = edgesMap.get(key);
-            if (null != subsequentNodes) {
-                for (Key subsequentNode : subsequentNodes) {
-                    if (subsequentNode.equals(fromNode)) {
-                        return false;
-                    }
-
-                    queue.add(subsequentNode);
-                }
-            }
-        }
-
-        return true;
     }
 
 
