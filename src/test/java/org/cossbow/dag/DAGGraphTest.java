@@ -3,9 +3,13 @@ package org.cossbow.dag;
 import org.junit.Assert;
 import org.junit.Test;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ThreadLocalRandom;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 public class DAGGraphTest {
 
@@ -127,8 +131,8 @@ public class DAGGraphTest {
     }
 
     @Test
-    public void bfs() {
-        var nodes = Set.of(1, 2, 3, 4,5,6);
+    public void testBFS() {
+        var nodes = Set.of(1, 2, 3, 4, 5, 6);
         var edges = List.of(
                 Map.entry(1, 2),
                 Map.entry(1, 3),
@@ -140,6 +144,37 @@ public class DAGGraphTest {
         DAGUtil.bfs(nodes, edges, i -> {
             System.out.println(i);
         });
+    }
+
+    @Test
+    public void testRand() {
+        var size = ThreadLocalRandom.current().nextInt(10, 1000);
+        randDAG(size);
+    }
+
+    //
+
+    static DAGGraph<Integer> randDAG(int size) {
+        return randDAG(size, Function.identity());
+    }
+
+    static <Key> DAGGraph<Key> randDAG(int size, Function<Integer, Key> mapper) {
+        if (size <= 0) throw new IllegalArgumentException();
+
+        var rand = ThreadLocalRandom.current();
+        var nodes = rand
+                .ints(1, size * 10)
+                .boxed().distinct().limit(size).sorted().map(mapper).collect(Collectors.toList());
+        var edges = new ArrayList<Map.Entry<Key, Key>>();
+        for (int i = 0; i < size; i++) {
+            for (int j = i + 1; j < size; j++) {
+                if (rand.nextInt() % 2 == 0) {
+                    edges.add(Map.entry(nodes.get(i), nodes.get(j)));
+                }
+            }
+        }
+
+        return new DAGGraph<Key>(nodes, edges);
     }
 
 }

@@ -43,9 +43,6 @@ public class DAGTaskTest {
 
     @Test
     public void testTask() {
-        final var executor = CompletableFuture.delayedExecutor(500, TimeUnit.MILLISECONDS,
-                EXECUTOR);
-
         var task = new DAGTask<String, Integer>(graph, (node, results) -> {
             System.out.println("Node-" + node + " input: " + results);
             var input = results.isEmpty() ? 1 :
