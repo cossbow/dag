@@ -82,18 +82,7 @@ public class DAGGraph<Key> {
     //
 
     public void bfs(Consumer<Key> consumer) {
-        var queue = new ArrayDeque<>(heads);
-        var set = new HashMap<Key, Object>(allNodes.size());
-        while (!queue.isEmpty()) {
-            Key ck = queue.pop();
-            var next = next(ck);
-            for (Key nk : next) {
-                if (set.put(nk, Boolean.TRUE) != null) {
-
-                }
-                queue.push(nk);
-            }
-        }
+        DAGUtil.bfs(allNodes, forwardIndex, reverseIndex, consumer);
     }
 
 }

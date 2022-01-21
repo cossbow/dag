@@ -149,7 +149,10 @@ public class DAGGraphTest {
     @Test
     public void testRand() {
         var size = ThreadLocalRandom.current().nextInt(10, 1000);
-        randDAG(size);
+        var r = randDAG(size);
+        r.bfs(i -> {
+            System.out.println(i);
+        });
     }
 
     //
