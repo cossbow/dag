@@ -1,6 +1,9 @@
 package org.cossbow.dag;
 
-import java.util.*;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Set;
 import java.util.function.Consumer;
 
 
@@ -31,23 +34,27 @@ public class DAGGraph<Key> {
             throw new IllegalArgumentException("Has duplicate Key");
         }
 
+        var keyMap = new HashMap<Key, Key>(this.allNodes.size());
+        for (Key k : this.allNodes) {
+            keyMap.put(k, k);
+        }
+
         var forward = new HashMap<Key, Set<Key>>();
         var reverse = new HashMap<Key, Set<Key>>();
         for (var edge : edges) {
-            Key from = edge.getKey(), to = edge.getValue();
-
-            if (!this.allNodes.contains(from)) {
-                throw new IllegalArgumentException("Key not exists: " + from);
+            Key from = keyMap.get(edge.getKey()), to = keyMap.get(edge.getValue());
+            if (from == null) {
+                throw new IllegalArgumentException("Key not exists: " + edge.getKey());
             }
-            if (!this.allNodes.contains(to)) {
-                throw new IllegalArgumentException("Key not exists: " + to);
+            if (to == null) {
+                throw new IllegalArgumentException("Key not exists: " + edge.getValue());
             }
 
             forward.computeIfAbsent(from, DAGUtil.hashSet()).add(to);
             reverse.computeIfAbsent(to, DAGUtil.hashSet()).add(from);
         }
         if (!DAGUtil.checkAcyclic(this.allNodes, forward, reverse)) {
-            throw new IllegalArgumentException("Serious error: graph has cyclic");
+            throw new IllegalArgumentException("Serious error: graph has cycle！");
         }
 
         this.forwardIndex = DAGUtil.toImmutable(forward);

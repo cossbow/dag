@@ -1,7 +1,7 @@
 package org.cossbow.dag;
 
-import org.junit.Assert;
-import org.junit.Test;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -25,8 +25,8 @@ public class DAGGraphTest {
         new DAGGraph<>(nodes, edges);
 
         var re = DAGUtil.topologicalSort(Set.copyOf(nodes), edges);
-        Assert.assertTrue(re.getKey());
-        Assert.assertEquals(nodes, re.getValue());
+        Assertions.assertTrue(re.getKey());
+        Assertions.assertEquals(nodes, re.getValue());
     }
 
     @Test
@@ -40,12 +40,12 @@ public class DAGGraphTest {
         );
         try {
             new DAGGraph<>(nodes, edges);
-            Assert.fail("The graph is illegal");
+            Assertions.fail("The graph is illegal");
         } catch (IllegalArgumentException e) {
         }
 
         var re = DAGUtil.topologicalSort(Set.copyOf(nodes), edges);
-        Assert.assertFalse(re.getKey());
+        Assertions.assertFalse(re.getKey());
     }
 
     @Test
@@ -60,12 +60,12 @@ public class DAGGraphTest {
         );
         try {
             new DAGGraph<>(nodes, edges);
-            Assert.fail("The graph is illegal");
+            Assertions.fail("The graph is illegal");
         } catch (IllegalArgumentException e) {
         }
 
         var re = DAGUtil.topologicalSort(Set.copyOf(nodes), edges);
-        Assert.assertFalse(re.getKey());
+        Assertions.assertFalse(re.getKey());
     }
 
     @Test
@@ -81,7 +81,7 @@ public class DAGGraphTest {
         );
         try {
             new DAGGraph<>(nodes, edges);
-            Assert.fail("It's a cyclic graph");
+            Assertions.fail("It's a cyclic graph");
         } catch (IllegalArgumentException e) {
             System.out.println(e.getMessage());
         }
@@ -101,8 +101,8 @@ public class DAGGraphTest {
         );
         var graph = new DAGGraph<>(nodes, edges);
 
-        Assert.assertEquals(Set.of(1, 6), graph.heads());
-        Assert.assertEquals(Set.of(4, 5), graph.tails());
+        Assertions.assertEquals(Set.of(1, 6), graph.heads());
+        Assertions.assertEquals(Set.of(4, 5), graph.tails());
     }
 
     @Test
@@ -115,19 +115,19 @@ public class DAGGraphTest {
                 Map.entry(3, 4)
         );
         var r = new DAGGraph<>(nodes, edges);
-        Assert.assertEquals(Set.copyOf(nodes), r.allNodes());
+        Assertions.assertEquals(Set.copyOf(nodes), r.allNodes());
 
-        Assert.assertEquals(Set.of(1), r.heads());
-        Assert.assertEquals(Set.of(2, 3), r.next(1));
-        Assert.assertEquals(Set.of(4), r.next(2));
-        Assert.assertEquals(Set.of(4), r.next(3));
-        Assert.assertTrue(r.next(4).isEmpty());
+        Assertions.assertEquals(Set.of(1), r.heads());
+        Assertions.assertEquals(Set.of(2, 3), r.next(1));
+        Assertions.assertEquals(Set.of(4), r.next(2));
+        Assertions.assertEquals(Set.of(4), r.next(3));
+        Assertions.assertTrue(r.next(4).isEmpty());
 
-        Assert.assertEquals(Set.of(4), r.tails());
-        Assert.assertEquals(Set.of(2, 3), r.prev(4));
-        Assert.assertEquals(Set.of(1), r.prev(2));
-        Assert.assertEquals(Set.of(1), r.prev(3));
-        Assert.assertTrue(r.prev(1).isEmpty());
+        Assertions.assertEquals(Set.of(4), r.tails());
+        Assertions.assertEquals(Set.of(2, 3), r.prev(4));
+        Assertions.assertEquals(Set.of(1), r.prev(2));
+        Assertions.assertEquals(Set.of(1), r.prev(3));
+        Assertions.assertTrue(r.prev(1).isEmpty());
     }
 
     @Test

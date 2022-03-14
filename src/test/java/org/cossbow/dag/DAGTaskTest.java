@@ -1,91 +1,125 @@
 package org.cossbow.dag;
 
-import org.junit.Test;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
 
 import java.util.Collection;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.*;
+
+import static org.cossbow.dag.DAGTaskTest.TestNode.*;
 
 public class DAGTaskTest {
-
-
     static final ExecutorService EXECUTOR = Executors.newFixedThreadPool(16);
 
-    final HashSet<String> nodes;
-    final List<Map.Entry<String, String>> edges;
-    final DAGGraph<String> graph;
+    @AfterAll
+    public static void shutdown() {
+        EXECUTOR.shutdown();
+    }
+
+
+    enum TestNode {
+        N1,
+        N2,
+        N3,
+        N4,
+        N5,
+        N6,
+    }
+
+    final DAGGraph<TestNode> graph;
 
     {
-        nodes = new HashSet<>();
-        for (int i = 1; i <= 6; i++) {
-            var key = "N-" + i;
-            nodes.add(key);
-        }
-
-        edges = List.of(
-                Map.entry("N-1", "N-2"),
-                Map.entry("N-1", "N-3"),
-                Map.entry("N-2", "N-4"),
-                Map.entry("N-3", "N-4"),
-                Map.entry("N-3", "N-5"),
-                Map.entry("N-5", "N-6"),
-                Map.entry("N-1", "N-6")
+        var edges = List.of(
+                Map.entry(N1, N2),
+                Map.entry(N1, N3),
+                Map.entry(N2, N4),
+                Map.entry(N3, N4),
+                Map.entry(N3, N5),
+                Map.entry(N5, N6),
+                Map.entry(N1, N6)
         );
 
-        graph = new DAGGraph<>(nodes, edges);
+        graph = new DAGGraph<>(List.of(values()), edges);
+    }
+
+    static int sumDAGResults(Collection<Integer> results) {
+        return results.stream().mapToInt(Integer::intValue).sum();
     }
 
     @Test
-    public void testTask() {
-        var task = new DAGTask<String, Integer>(graph, (node, results) -> {
-            System.out.println("Node-" + node + " input: " + results);
-            var input = results.isEmpty() ? 1 :
-                    results.values().stream().mapToInt(Integer::intValue).sum();
-            var output = input + 1;
-            System.out.println("Node-" + node + " return: " + (output));
-            return CompletableFuture.completedFuture(output);
+    public void testCalc() {
+        final var executor = CompletableFuture.delayedExecutor(
+                500, TimeUnit.MILLISECONDS, EXECUTOR);
+        final var input = 1;
+        var task = new DAGTask<TestNode, Integer>(graph, (k, results) -> {
+            System.out.println(k + " input " + results);
+            var in = results.isEmpty() ? input : sumDAGResults(results.values());
+            return CompletableFuture.supplyAsync(() -> {
+                System.out.println(k + " return " + (in + 1));
+                return in + 1;
+            }, executor);
         });
         EXECUTOR.execute(task);
+        EXECUTOR.execute(task); // 重复执行无影响
         var re = task.join();
-        var sum = re.values().stream().mapToInt(Integer::intValue).sum();
+        var sum = sumDAGResults(re.values());
         System.out.println(sum);
-
-
-        EXECUTOR.shutdown();
     }
 
     @Test
-    public void testHandler() {
-        final var executor = CompletableFuture.delayedExecutor(500, TimeUnit.MILLISECONDS,
-                EXECUTOR);
-        final var seq = new AtomicInteger();
-
-        var handler = new DAGNodeHandler<Integer, String, Integer>(
-                seq::incrementAndGet, (id, node, results) -> {
-            System.out.println("Node-" + node + "/Subtask-" + id + " input " + results);
-            var args = results.isEmpty() ? 1 : results.values().stream().mapToInt(DAGResult::getData).sum();
-            return DAGResult.success(args);
-        }, (id, node, input) -> CompletableFuture.supplyAsync(() -> {
-            System.out.println("Node-" + node + "/Subtask-" + id + " return " + (input + 1));
-            return DAGResult.success(input + 1);
-        }, executor));
-        var task = new DAGTask<>(graph, handler);
+    public void testCancelSubtask() {
+        final var executor = CompletableFuture.delayedExecutor(
+                1000, TimeUnit.MILLISECONDS, EXECUTOR);
+        final var input = 1;
+        var task = new DAGTask<TestNode, Integer>(graph, (k, results) -> {
+            if (N3 == k) {
+                var fc = new CompletableFuture<Integer>();
+                executor.execute(() -> {
+                    fc.cancel(false);
+                });
+                return fc;
+            }
+            var in = results.isEmpty() ? input : sumDAGResults(results.values());
+            return CompletableFuture.supplyAsync(() -> {
+                System.out.println(k + " return " + (in + 1));
+                return in + 1;
+            }, executor);
+        });
         EXECUTOR.execute(task);
-        EXECUTOR.execute(task);
-        var re = task.join();
-        var sum = re.values().stream().mapToInt(DAGResult::getData).sum();
-        System.out.println(sum);
 
+        try {
+            task.join();
+            Assertions.fail("Task should be canceled.");
+        } catch (CancellationException e) {
+        }
 
-        EXECUTOR.shutdown();
     }
 
+    @Test
+    public void testCancelTask() {
+        final var executor = CompletableFuture.delayedExecutor(
+                500, TimeUnit.MILLISECONDS, EXECUTOR);
+        final var input = 1;
+        var task = new DAGTask<TestNode, Integer>(graph, (k, results) -> {
+            var in = results.isEmpty() ? input : sumDAGResults(results.values());
+            return CompletableFuture.supplyAsync(() -> {
+                System.out.println(k + " return " + (in + 1));
+                return in + 1;
+            }, executor);
+        });
+        EXECUTOR.execute(task);
+        CompletableFuture.delayedExecutor(1000, TimeUnit.MILLISECONDS, EXECUTOR)
+                .execute(() -> task.cancel(false));
 
+        try {
+            task.join();
+            Assertions.fail("Task should be canceled.");
+        } catch (CancellationException e) {
+        }
+
+    }
 
 }

@@ -2,11 +2,10 @@ package org.cossbow.dag;
 
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.VarHandle;
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Objects;
+import java.util.*;
+import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.BiFunction;
 
@@ -33,13 +32,14 @@ public class DAGTask<Key, Result>
     private final BiFunction<Key, Map<Key, Result>,
             CompletableFuture<Result>> handler;
 
-
     // 运行状态Future
     private final Map<Key, CompletableFuture<?>> futures =
             new ConcurrentHashMap<>();
     // 执行结果集
     private final Map<Key, Result> results =
             new ConcurrentHashMap<>();
+    private final Map<Key, Result> immutableResults =
+            Collections.unmodifiableMap(results);
     // 是否已经启动
     private volatile boolean started = false;
 
@@ -49,6 +49,7 @@ public class DAGTask<Key, Result>
                            CompletableFuture<Result>> handler) {
         this.graph = Objects.requireNonNull(graph);
         this.handler = Objects.requireNonNull(handler);
+
     }
 
     private Map<Key, Result> dependentResults(Key key) {
@@ -98,7 +99,18 @@ public class DAGTask<Key, Result>
                 if (null == e) {
                     complete(results);
                 } else {
-                    completeExceptionally(e);
+                    if (e instanceof CancellationException) {
+                        cancel(false);
+                    } else if (e instanceof CompletionException) {
+                        var ex = e.getCause();
+                        if (ex instanceof CancellationException) {
+                            cancel(false);
+                        } else {
+                            completeExceptionally(e);
+                        }
+                    } else {
+                        completeExceptionally(e);
+                    }
                 }
             });
         } catch (Throwable e) {
@@ -115,8 +127,20 @@ public class DAGTask<Key, Result>
         execute();
     }
 
+    @Override
+    public boolean cancel(boolean mayInterruptIfRunning) {
+        for (CompletableFuture<?> future : futures.values()) {
+            future.cancel(mayInterruptIfRunning);
+        }
+        return super.cancel(mayInterruptIfRunning);
+    }
+
     public boolean isStarted() {
         return started;
+    }
+
+    public Map<Key, Result> results() {
+        return immutableResults;
     }
 
 }
